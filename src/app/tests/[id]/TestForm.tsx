@@ -15,6 +15,16 @@ interface Question {
   options: Option[]
 }
 
+interface ResultType {
+  id: string
+  name: string
+  displayName: string
+  color: string
+  description: string
+  explanation: string
+  advice: string
+}
+
 interface Test {
   id: string
   title: string
@@ -25,18 +35,37 @@ interface TestFormProps {
   test: Test
 }
 
+interface TestResult {
+  resultType: ResultType
+  totalScore: number
+  shareToken?: string
+}
+
 export default function TestForm({ test }: TestFormProps) {
   const router = useRouter()
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  const [result, setResult] = useState<{ totalScore: number; maxScore: number } | null>(null)
+  const [result, setResult] = useState<TestResult | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const handleOptionChange = (questionId: string, optionId: string) => {
     setAnswers({
       ...answers,
       [questionId]: optionId,
     })
+  }
+
+  const copyShareLink = async (shareToken: string) => {
+    const shareUrl = `${window.location.origin}/results/${shareToken}`
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (error) {
+      console.error('Copy share link error:', error)
+      alert('复制链接失败，请手动复制')
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,19 +94,28 @@ export default function TestForm({ test }: TestFormProps) {
       if (res.ok) {
         const data = await res.json()
         
-        // 计算得分
-        let totalScore = 0
-        let maxScore = 0
-        test.questions.forEach((q) => {
-          const selectedOption = q.options.find((o) => o.id === answers[q.id])
-          const maxOptionScore = Math.max(...q.options.map((o) => o.score))
-          if (selectedOption) {
-            totalScore += selectedOption.score
-          }
-          maxScore += maxOptionScore
-        })
+        if (data.testResult) {
+          // 有配置结果类型，显示类型结果
+          setResult({
+            resultType: data.testResult.resultType,
+            totalScore: data.testResult.totalScore,
+            shareToken: data.testResult.shareToken,
+          })
+        } else {
+          // 没有配置结果类型，只显示分数
+          let totalScore = 0
+          test.questions.forEach((q) => {
+            const selectedOption = q.options.find((o) => o.id === answers[q.id])
+            if (selectedOption) {
+              totalScore += selectedOption.score
+            }
+          })
+          setResult({
+            resultType: {} as ResultType,
+            totalScore,
+          })
+        }
         
-        setResult({ totalScore, maxScore })
         setSubmitted(true)
       } else {
         alert('提交失败，请重试')
@@ -91,6 +129,97 @@ export default function TestForm({ test }: TestFormProps) {
   }
 
   if (submitted && result) {
+    // 如果有结果类型，显示美观的结果页面
+    if (result.resultType && result.resultType.name) {
+      return (
+        <div className="min-h-screen" style={{ backgroundColor: result.resultType.color + '15' }}>
+          <div className="max-w-3xl mx-auto px-4 py-12">
+            <div className="bg-white shadow-2xl rounded-2xl overflow-hidden">
+              {/* 头部 */}
+              <div 
+                className="p-8 text-white text-center"
+                style={{ backgroundColor: result.resultType.color }}
+              >
+                <div className="text-6xl font-bold mb-2">{result.resultType.name}</div>
+                <div className="text-2xl opacity-90">{result.resultType.displayName}</div>
+              </div>
+              
+              {/* 内容 */}
+              <div className="p-8 space-y-8">
+                {/* 描述 */}
+                <section>
+                  <h3 className="text-xl font-bold text-gray-800 mb-3 flex items-center">
+                    <span className="w-1 h-6 mr-3 rounded" style={{ backgroundColor: result.resultType.color }}></span>
+                    类型描述
+                  </h3>
+                  <p className="text-gray-600 leading-relaxed pl-4">
+                    {result.resultType.description}
+                  </p>
+                </section>
+                
+                {/* 解释 */}
+                <section>
+                  <h3 className="text-xl font-bold text-gray-800 mb-3 flex items-center">
+                    <span className="w-1 h-6 mr-3 rounded" style={{ backgroundColor: result.resultType.color }}></span>
+                    详细解析
+                  </h3>
+                  <p className="text-gray-600 leading-relaxed pl-4">
+                    {result.resultType.explanation}
+                  </p>
+                </section>
+                
+                {/* 建议 */}
+                <section>
+                  <h3 className="text-xl font-bold text-gray-800 mb-3 flex items-center">
+                    <span className="w-1 h-6 mr-3 rounded" style={{ backgroundColor: result.resultType.color }}></span>
+                    发展建议
+                  </h3>
+                  <div className="pl-4">
+                    <p className="text-gray-600 leading-relaxed">
+                      {result.resultType.advice}
+                    </p>
+                  </div>
+                </section>
+                
+                {/* 分享 */}
+                {result.shareToken && (
+                  <section className="pt-6 border-t border-gray-200">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">分享你的结果</h3>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => copyShareLink(result.shareToken!)}
+                        className="flex-1 py-3 px-4 rounded-lg text-white font-medium transition-all hover:opacity-90"
+                        style={{ backgroundColor: result.resultType.color }}
+                      >
+                        {copied ? '✓ 已复制' : '复制分享链接'}
+                      </button>
+                      <button
+                        onClick={() => router.push(`/results/${result.shareToken}`)}
+                        className="py-3 px-4 rounded-lg border-2 font-medium transition-all hover:bg-gray-50"
+                        style={{ borderColor: result.resultType.color, color: result.resultType.color }}
+                      >
+                        查看结果页
+                      </button>
+                    </div>
+                  </section>
+                )}
+              </div>
+            </div>
+            
+            <div className="mt-8 text-center">
+              <button
+                onClick={() => router.push('/')}
+                className="inline-flex items-center text-gray-600 hover:text-gray-800"
+              >
+                ← 返回首页
+              </button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+    
+    // 没有结果类型时显示简单的分数页面
     return (
       <div className="bg-white shadow sm:rounded-lg p-8 text-center">
         <div className="mb-6">
@@ -117,7 +246,6 @@ export default function TestForm({ test }: TestFormProps) {
             <span className="text-3xl font-bold text-indigo-600 mx-2">
               {result.totalScore}
             </span>
-            / {result.maxScore}
           </p>
         </div>
         <button
