@@ -1,0 +1,60 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Test {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  status      String   @default("draft") // draft, published, archived
+  questions   Question[]
+  responses   Response[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Question {
+  id       String   @id @default(cuid())
+  content  String
+  order    Int
+  options  Option[]
+  testId   String
+  test     Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  answers  Answer[]
+}
+
+model Option {
+  id         String   @id @default(cuid())
+  content    String
+  score      Int      @default(0)
+  order      Int
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answers    Answer[]
+}
+
+model Response {
+  id        String   @id @default(cuid())
+  testId    String
+  test      Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  answers   Answer[]
+  createdAt DateTime @default(now())
+}
+
+model Answer {
+  id         String   @id @default(cuid())
+  responseId String
+  response   Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  optionId   String
+  option     Option   @relation(fields: [optionId], references: [id], onDelete: Cascade)
+}
