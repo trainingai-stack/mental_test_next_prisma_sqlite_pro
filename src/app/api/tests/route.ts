@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+interface OptionInput {
+  content: string
+  score: number
+}
+
+interface QuestionInput {
+  content: string
+  options: OptionInput[]
+}
+
 // 获取所有测试单
 export async function GET() {
   try {
@@ -18,7 +28,7 @@ export async function GET() {
       },
     })
     return NextResponse.json(tests)
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to fetch tests' },
       { status: 500 }
@@ -37,11 +47,11 @@ export async function POST(request: NextRequest) {
         title,
         description,
         questions: {
-          create: questions.map((q: any, index: number) => ({
+          create: questions.map((q: QuestionInput, index: number) => ({
             content: q.content,
             order: index,
             options: {
-              create: q.options.map((opt: any, optIndex: number) => ({
+              create: q.options.map((opt: OptionInput, optIndex: number) => ({
                 content: opt.content,
                 score: opt.score || 0,
                 order: optIndex,

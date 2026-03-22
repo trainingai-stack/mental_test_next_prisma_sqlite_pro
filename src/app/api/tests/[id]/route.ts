@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+interface OptionInput {
+  content: string
+  score: number
+}
+
+interface QuestionInput {
+  content: string
+  options: OptionInput[]
+}
+
 // 获取单个测试单
 export async function GET(
   request: NextRequest,
@@ -34,7 +44,7 @@ export async function GET(
     }
 
     return NextResponse.json(test)
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to fetch test' },
       { status: 500 }
@@ -94,11 +104,11 @@ export async function PUT(
         description,
         status,
         questions: {
-          create: questions.map((q: any, index: number) => ({
+          create: questions.map((q: QuestionInput, index: number) => ({
             content: q.content,
             order: index,
             options: {
-              create: q.options.map((opt: any, optIndex: number) => ({
+              create: q.options.map((opt: OptionInput, optIndex: number) => ({
                 content: opt.content,
                 score: opt.score || 0,
                 order: optIndex,
@@ -138,7 +148,7 @@ export async function DELETE(
     })
 
     return NextResponse.json({ message: 'Test deleted successfully' })
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to delete test' },
       { status: 500 }

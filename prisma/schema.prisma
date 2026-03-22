@@ -11,14 +11,15 @@ datasource db {
 }
 
 model Test {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
   title       String
   description String?
-  status      String   @default("draft") // draft, published, archived
+  status      String       @default("draft") // draft, published, archived
   questions   Question[]
   responses   Response[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  results     TestResult[] // 测试结果类型
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 model Question {
@@ -42,11 +43,12 @@ model Option {
 }
 
 model Response {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
   testId    String
-  test      Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  test      Test             @relation(fields: [testId], references: [id], onDelete: Cascade)
   answers   Answer[]
-  createdAt DateTime @default(now())
+  results   ResponseResult[] // 匹配到的结果
+  createdAt DateTime         @default(now())
 }
 
 model Answer {
@@ -57,4 +59,49 @@ model Answer {
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
   optionId   String
   option     Option   @relation(fields: [optionId], references: [id], onDelete: Cascade)
+}
+
+// 测试结果类型 - 类似MBTI的结果分类
+model TestResult {
+  id          String   @id @default(cuid())
+  testId      String
+  test        Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  name        String   // 结果名称，如"INTJ-建筑师"
+  code        String   // 结果代码，如"INTJ"
+  description String   // 结果描述
+  explanation String   // 详细解释
+  advice      String   // 建议
+  imageUrl    String?  // 结果图片（可选）
+  order       Int      @default(0) // 排序
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // 匹配规则
+  rules       ResultRule[]
+  // 匹配到的响应
+  responses   ResponseResult[]
+}
+
+// 结果匹配规则 - 定义哪些选项组合会得到某个结果
+model ResultRule {
+  id           String     @id @default(cuid())
+  resultId     String
+  result       TestResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  // 规则条件：存储题目ID和选项ID的映射
+  // 格式: JSON对象，key为questionId，value为optionId数组（满足任一即可）
+  conditions   String     // JSON字符串存储条件
+  priority     Int        @default(0) // 规则优先级，数字越大优先级越高
+  createdAt    DateTime   @default(now())
+}
+
+// 响应与结果的关联
+model ResponseResult {
+  id         String     @id @default(cuid())
+  responseId String
+  response   Response   @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  resultId   String
+  result     TestResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  createdAt  DateTime   @default(now())
+  
+  @@unique([responseId, resultId])
 }

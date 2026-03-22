@@ -1,21 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-// 获取单个响应详情
+// 获取单个响应（用于分享结果）
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
+
     const response = await prisma.response.findUnique({
       where: { id },
       include: {
-        test: true,
+        test: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+          },
+        },
         answers: {
           include: {
-            question: true,
-            option: true,
+            question: {
+              select: {
+                id: true,
+                content: true,
+              },
+            },
+            option: {
+              select: {
+                id: true,
+                content: true,
+                score: true,
+              },
+            },
+          },
+        },
+        results: {
+          include: {
+            result: true,
           },
         },
       },
@@ -30,6 +53,7 @@ export async function GET(
 
     return NextResponse.json(response)
   } catch (error) {
+    console.error('Fetch response error:', error)
     return NextResponse.json(
       { error: 'Failed to fetch response' },
       { status: 500 }
