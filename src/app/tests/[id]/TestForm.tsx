@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 interface Option {
   id: string
@@ -15,10 +16,22 @@ interface Question {
   options: Option[]
 }
 
+interface ResultType {
+  id: string
+  name: string
+  title: string
+  description: string
+  explanation: string | null
+  suggestion: string | null
+  color: string
+  icon: string | null
+}
+
 interface Test {
   id: string
   title: string
   questions: Question[]
+  resultTypes?: ResultType[]
 }
 
 interface TestFormProps {
@@ -30,7 +43,12 @@ export default function TestForm({ test }: TestFormProps) {
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  const [result, setResult] = useState<{ totalScore: number; maxScore: number } | null>(null)
+  const [result, setResult] = useState<{
+    responseId: string
+    totalScore: number
+    maxScore: number
+    resultType: ResultType | null
+  } | null>(null)
 
   const handleOptionChange = (questionId: string, optionId: string) => {
     setAnswers({
@@ -42,7 +60,6 @@ export default function TestForm({ test }: TestFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // 验证是否回答了所有问题
     const unansweredQuestions = test.questions.filter((q) => !answers[q.id])
     if (unansweredQuestions.length > 0) {
       alert(`还有 ${unansweredQuestions.length} 道题目未回答，请完成所有题目`)
@@ -65,7 +82,6 @@ export default function TestForm({ test }: TestFormProps) {
       if (res.ok) {
         const data = await res.json()
         
-        // 计算得分
         let totalScore = 0
         let maxScore = 0
         test.questions.forEach((q) => {
@@ -77,7 +93,12 @@ export default function TestForm({ test }: TestFormProps) {
           maxScore += maxOptionScore
         })
         
-        setResult({ totalScore, maxScore })
+        setResult({
+          responseId: data.id,
+          totalScore,
+          maxScore,
+          resultType: data.resultType,
+        })
         setSubmitted(true)
       } else {
         alert('提交失败，请重试')
@@ -90,42 +111,151 @@ export default function TestForm({ test }: TestFormProps) {
     }
   }
 
+  const handleShare = async () => {
+    if (!result) return
+    
+    const shareUrl = `${window.location.origin}/results/${result.responseId}`
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${test.title} - 我的测试结果`,
+          text: result.resultType?.title || '测试完成',
+          url: shareUrl,
+        })
+      } catch {
+        await navigator.clipboard.writeText(shareUrl)
+        alert('链接已复制到剪贴板')
+      }
+    } else {
+      await navigator.clipboard.writeText(shareUrl)
+      alert('链接已复制到剪贴板')
+    }
+  }
+
   if (submitted && result) {
     return (
-      <div className="bg-white shadow sm:rounded-lg p-8 text-center">
-        <div className="mb-6">
-          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100">
-            <svg
-              className="h-8 w-8 text-green-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
+      <div className="space-y-6">
+        <div className="bg-white shadow-xl sm:rounded-lg overflow-hidden">
+          {result.resultType && (
+            <div
+              className="h-2"
+              style={{ backgroundColor: result.resultType.color }}
+            />
+          )}
+          
+          <div className="p-8 text-center">
+            <div className="mb-6">
+              <div
+                className="mx-auto flex items-center justify-center h-20 w-20 rounded-full"
+                style={{ 
+                  backgroundColor: result.resultType 
+                    ? `${result.resultType.color}20` 
+                    : '#6366f120'
+                }}
+              >
+                <svg
+                  className="h-10 w-10"
+                  style={{ color: result.resultType?.color || '#6366f1' }}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+            </div>
+
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              测试完成！
+            </h2>
+
+            {result.resultType ? (
+              <div className="space-y-4">
+                <div
+                  className="inline-block px-4 py-2 rounded-full text-lg font-semibold"
+                  style={{ 
+                    backgroundColor: `${result.resultType.color}15`,
+                    color: result.resultType.color
+                  }}
+                >
+                  {result.resultType.title}
+                </div>
+
+                <p className="text-gray-600 text-lg">
+                  {result.resultType.description}
+                </p>
+
+                {result.resultType.explanation && (
+                  <div className="bg-gray-50 rounded-lg p-6 text-left mt-6">
+                    <h3 className="text-md font-semibold text-gray-900 mb-3 flex items-center">
+                      <svg className="w-5 h-5 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      结果解读
+                    </h3>
+                    <p className="text-gray-700 whitespace-pre-wrap">
+                      {result.resultType.explanation}
+                    </p>
+                  </div>
+                )}
+
+                {result.resultType.suggestion && (
+                  <div className="bg-indigo-50 rounded-lg p-6 text-left mt-4">
+                    <h3 className="text-md font-semibold text-gray-900 mb-3 flex items-center">
+                      <svg className="w-5 h-5 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                      建议
+                    </h3>
+                    <p className="text-gray-700 whitespace-pre-wrap">
+                      {result.resultType.suggestion}
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                <p className="text-lg text-gray-700">
+                  您的得分：
+                  <span className="text-3xl font-bold text-indigo-600 mx-2">
+                    {result.totalScore}
+                  </span>
+                  / {result.maxScore}
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-center space-x-4 mt-8">
+              <button
+                onClick={handleShare}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+                分享结果
+              </button>
+              <Link
+                href={`/results/${result.responseId}`}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                查看详情页
+              </Link>
+              <button
+                onClick={() => router.push('/')}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                返回首页
+              </button>
+            </div>
           </div>
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">测试完成！</h2>
-        <div className="bg-gray-50 rounded-lg p-6 mb-6">
-          <p className="text-lg text-gray-700">
-            您的得分：
-            <span className="text-3xl font-bold text-indigo-600 mx-2">
-              {result.totalScore}
-            </span>
-            / {result.maxScore}
-          </p>
-        </div>
-        <button
-          onClick={() => router.push('/')}
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-        >
-          返回首页
-        </button>
       </div>
     )
   }

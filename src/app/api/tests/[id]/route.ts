@@ -1,6 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+interface OptionInput {
+  content: string
+  score?: number
+}
+
+interface QuestionInput {
+  content: string
+  options: OptionInput[]
+}
+
+interface TestUpdateBody {
+  title: string
+  description?: string
+  status: string
+  questions?: QuestionInput[]
+}
+
 // 获取单个测试单
 export async function GET(
   request: NextRequest,
@@ -18,6 +35,14 @@ export async function GET(
                 order: 'asc',
               },
             },
+          },
+          orderBy: {
+            order: 'asc',
+          },
+        },
+        resultTypes: {
+          include: {
+            conditions: true,
           },
           orderBy: {
             order: 'asc',
@@ -49,7 +74,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const body = await request.json()
+    const body: TestUpdateBody = await request.json()
     const { title, description, status, questions } = body
 
     // 如果没有提供 questions，则只更新基本信息
@@ -94,11 +119,11 @@ export async function PUT(
         description,
         status,
         questions: {
-          create: questions.map((q: any, index: number) => ({
+          create: questions.map((q: QuestionInput, index: number) => ({
             content: q.content,
             order: index,
             options: {
-              create: q.options.map((opt: any, optIndex: number) => ({
+              create: q.options.map((opt: OptionInput, optIndex: number) => ({
                 content: opt.content,
                 score: opt.score || 0,
                 order: optIndex,

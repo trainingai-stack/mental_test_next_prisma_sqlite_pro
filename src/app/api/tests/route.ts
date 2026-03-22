@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+interface OptionInput {
+  content: string
+  score?: number
+}
+
+interface QuestionInput {
+  content: string
+  options: OptionInput[]
+}
+
+interface TestCreateBody {
+  title: string
+  description?: string
+  questions: QuestionInput[]
+}
+
 // 获取所有测试单
 export async function GET() {
   try {
@@ -29,7 +45,7 @@ export async function GET() {
 // 创建测试单
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    const body: TestCreateBody = await request.json()
     const { title, description, questions } = body
 
     const test = await prisma.test.create({
@@ -37,11 +53,11 @@ export async function POST(request: NextRequest) {
         title,
         description,
         questions: {
-          create: questions.map((q: any, index: number) => ({
+          create: questions.map((q: QuestionInput, index: number) => ({
             content: q.content,
             order: index,
             options: {
-              create: q.options.map((opt: any, optIndex: number) => ({
+              create: q.options.map((opt: OptionInput, optIndex: number) => ({
                 content: opt.content,
                 score: opt.score || 0,
                 order: optIndex,
