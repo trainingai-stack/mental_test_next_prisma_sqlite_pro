@@ -108,7 +108,9 @@ export default function CreateTestPage() {
       })
 
       if (res.ok) {
-        router.push('/')
+        const data = await res.json()
+        alert('创建成功！现在可以配置结果类型了')
+        router.push(`/admin/tests/${data.id}/edit`)
       } else {
         alert('创建失败，请重试')
       }

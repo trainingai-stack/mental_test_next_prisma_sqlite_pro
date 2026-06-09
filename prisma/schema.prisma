@@ -11,14 +11,15 @@ datasource db {
 }
 
 model Test {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  status      String   @default("draft") // draft, published, archived
-  questions   Question[]
-  responses   Response[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String       @id @default(cuid())
+  title        String
+  description  String?
+  status       String       @default("draft") // draft, published, archived
+  questions    Question[]
+  responses    Response[]
+  resultTypes  ResultType[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 }
 
 model Question {
@@ -42,11 +43,12 @@ model Option {
 }
 
 model Response {
-  id        String   @id @default(cuid())
-  testId    String
-  test      Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
-  answers   Answer[]
-  createdAt DateTime @default(now())
+  id          String       @id @default(cuid())
+  testId      String
+  test        Test         @relation(fields: [testId], references: [id], onDelete: Cascade)
+  answers     Answer[]
+  testResults TestResult[]
+  createdAt   DateTime     @default(now())
 }
 
 model Answer {
@@ -57,4 +59,45 @@ model Answer {
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
   optionId   String
   option     Option   @relation(fields: [optionId], references: [id], onDelete: Cascade)
+}
+
+// 结果类型定义 - 类似MBTI的各种类型（如INTJ, ENFP等）
+model ResultType {
+  id          String   @id @default(cuid())
+  name        String   // 类型名称（如："INTJ"）
+  displayName String   // 显示名称（如："建筑师"）
+  color       String   // 类型颜色（用于UI展示）
+  description String   // 详细描述
+  explanation String   // 解释说明
+  advice      String   // 建议
+  testId      String
+  test        Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  rules       ResultRule[]
+  results     TestResult[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 结果匹配规则 - 定义哪些选项组合会得到某个结果
+model ResultRule {
+  id           String     @id @default(cuid())
+  resultTypeId String
+  resultType   ResultType @relation(fields: [resultTypeId], references: [id], onDelete: Cascade)
+  // 存储规则条件，格式可以是JSON: {"questionId": ["optionId1", "optionId2"]}
+  conditions   String
+  // 匹配模式: all(必须满足所有条件), any(满足任意一个条件), score(达到指定分数)
+  matchType    String     @default("all")
+  scoreThreshold Int?     // 分数阈值（当matchType为score时使用）
+}
+
+// 用户测试结果
+model TestResult {
+  id           String     @id @default(cuid())
+  responseId   String     @unique
+  response     Response   @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  resultTypeId String
+  resultType   ResultType @relation(fields: [resultTypeId], references: [id], onDelete: Cascade)
+  shareToken   String?    @unique // 分享用的token
+  totalScore   Int        // 总分
+  createdAt    DateTime   @default(now())
 }
